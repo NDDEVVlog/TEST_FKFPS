@@ -4,11 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+
 #include "FPSCharacter.generated.h"
+
+
+
 class AWeapon;
-
-
-
+class UInventoryComponent;
 class ACombatFPSGameModeBase;
 
 
@@ -34,35 +36,11 @@ public:
 
 	FTimerHandle FireTimeHandle;
 
-
-	struct FInventory {
-
-
-		TArray	<AWeapon*> PrimaryWeapon;
-
-
-	};
-
-	FInventory Inventory;
-
-
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CombatStatus")
-		AWeapon* OnUseWeapon;
-
-public:	
-
-
-
-
-
-
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
-
 
 	/** Fires a projectile. */
 	void OnPrimaryAction();
@@ -89,7 +67,7 @@ public:
 
 	void FireShoot();
 
-	void SwapWeapon();
+	void SwapWeapon(int32 NumberofSlot);
 
 	void Reload();
 
@@ -97,24 +75,28 @@ public:
 
 	void NotReload();
 
+	void Pickup();
+
+	void Unequip();
+	
+	void Num1();
+	void Num2();
+	void Num3();
+	void Num4();
+	void Num5();
+
+
 	ACombatFPSGameModeBase* FPSGameMode;
+	UInventoryComponent* Inventory;
 
-	float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser);
-
-
-	
-	
-
-
-
-
+	float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CombatStatus")
 
-	float MaxAmmo;
+	float MaxAmmo=0;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CombatStatus")
 
-	float AmmoInReal;
+	float AmmoInReal=0;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CombatStatus")
 		bool isReload = false;
 
@@ -130,12 +112,8 @@ public:
 
 
 	UFUNCTION(BlueprintPure)
-		bool isDead() const { return Health <= 0; };
+		bool bIsDead() const { return Health <= 0; };
 	
 	int32 WeaponUsingNum;
 
-
-
-	bool hasPrimaryWeapon = false;
-	bool hasSecondaryWeapon = false;
 };

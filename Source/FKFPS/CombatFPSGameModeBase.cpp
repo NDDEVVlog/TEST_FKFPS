@@ -2,8 +2,8 @@
 
 
 #include "CombatFPSGameModeBase.h"
-#include "TeamBlue.h"
-#include "TeamRed.h"
+#include "TeamClass.h"
+#include "TeamData.h"
 #include "Kismet/GameplayStatics.h"
 
 void ACombatFPSGameModeBase::CountDown() {
@@ -22,18 +22,32 @@ void ACombatFPSGameModeBase::CountDown() {
 }
 
 void ACombatFPSGameModeBase::ActorDied(AActor* actorDied) {
-	if (ATeamBlue* BlueMem = Cast<ATeamBlue>(actorDied)) {
-		--BlueMembers;
-		if (BlueMembers == 0) {
-			UE_LOG(LogTemp, Warning, TEXT("Red Winnnnnnnnnnn"));
-		}
+	ATeamClass* Team = Cast<ATeamClass>(actorDied);
+	if (Team == nullptr) return;
+	
+	switch (Team->Team)
+	{
+	case EDataTeam::Terrorist: {
+		--TeamMember[0];
+		CheckWinCondition(EDataTeam::Terrorist, TeamMember[0]);
+		break;
 	}
-	else if(ATeamRed* RedMem = Cast<ATeamRed>(actorDied) ){
-		--RedMembers;
-		if (RedMembers == 0) {
-			UE_LOG(LogTemp, Warning, TEXT("Blue Winnnnnnnnnnn"));
+	case EDataTeam::CounterTerrorist: {
+		--TeamMember[1];
+		CheckWinCondition(EDataTeam::CounterTerrorist, TeamMember[1]);
 
-		}
+		break;
+	}
+	default:
+		break;
+	}
+}
+
+void ACombatFPSGameModeBase::CheckWinCondition(EDataTeam Data, int32 MemberLeft) {
+
+	FName RowName = FName(UEnum::GetDisplayValueAsText(Data).ToString());
+	if (MemberLeft <= 0) {
+		UE_LOG(LogTemp, Warning, TEXT("%s won the game"), *RowName.ToString() );
 	}
 }
 
@@ -41,24 +55,25 @@ void ACombatFPSGameModeBase::BeginPlay() {
 	Super::BeginPlay();
 	FTimerHandle TimerHandle;
 	GetWorldTimerManager().SetTimer(TimerHandle,this,&ACombatFPSGameModeBase::CountDown,1.f, true,0.0);
-	RedMembers = GetRedMemberNum();
+	TArray<AActor*> Pawn;
 
-	BlueMembers = GetBlueMemberNum();
+	UGameplayStatics::GetAllActorsOfClass(this, ATeamClass::StaticClass(),Pawn);
+	for (AActor* AssignedPawn : Pawn) {
+		ATeamClass* TeamClassMember = Cast<ATeamClass>(AssignedPawn);
+		if (!TeamClassMember) continue;
+		switch (TeamClassMember->Team)
+		{
+		case EDataTeam::Terrorist: {
+			TeamMember[0]++;
+			break;
+		}
+		case EDataTeam::CounterTerrorist: {
+			TeamMember[1]++;
 
-
-}
-
-int32 ACombatFPSGameModeBase::GetRedMemberNum() {
-	TArray<AActor*> Red;
-	UGameplayStatics::GetAllActorsOfClass(this, ATeamRed::StaticClass(), Red);
-	return Red.Num();
-
-}
-
-int32 ACombatFPSGameModeBase::GetBlueMemberNum() {
-	TArray<AActor*> Blue;
-	UGameplayStatics::GetAllActorsOfClass(this, ATeamBlue::StaticClass(), Blue);
-	return Blue.Num();
-
-
+			break;
+		}
+		default:
+			break;
+		}
+	}
 }

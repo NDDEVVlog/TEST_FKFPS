@@ -5,6 +5,8 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
+#include "FPSCharacter.h"
+#include "InventoryComponent.h"
 #include "FKFPSProjectile.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -14,28 +16,14 @@ AWeapon::AWeapon()
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
-	
-	Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
-	SetRootComponent(Root);
-	Mesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Mesh"));
-	Mesh->SetupAttachment(Root);
-	//SphereRadius = 32.f;
-
-
-	CollisionSphere = CreateDefaultSubobject<USphereComponent>("CollisionSphere");
-	CollisionSphere->SetSphereRadius(90.0f);
-	//CollisionSphere->bGenerateOverlapEvents = true;
-	CollisionSphere->SetupAttachment(RootComponent);
-	CollisionSphere->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Overlap);
-	CollisionSphere->bHiddenInGame = false;
-
+	Mesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Mesh"));	
+	RootComponent = Mesh;
 
 }
 
 void AWeapon::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangeEvent) {
 	Super::PostEditChangeProperty(PropertyChangeEvent);
 	GetDataFromTable();
-
 }
 
 
@@ -60,6 +48,7 @@ void AWeapon::GetDataFromTable() {
 			DamageNum = Row->Damage;
 			UE_LOG(LogTemp, Warning, TEXT("DamageNum:%f"), DamageNum);
 
+			ProjectileClass = Row->ProjectileClass;
 
 		}
 	}
@@ -70,12 +59,7 @@ void AWeapon::BeginPlay()
 {
 	Super::BeginPlay();
 	GetDataFromTable();
-
-	CollisionSphere->OnComponentBeginOverlap.AddDynamic(this, &AWeapon::OnSphereBeginOverlap);
-
 	InRealAmmo = AmmoPerReload;
-
-
 }
 
 // Called every frame
@@ -85,57 +69,11 @@ void AWeapon::Tick(float DeltaTime)
 
 }
 
-void AWeapon::OnSphereBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult) {
-	
-
-	
-	CollisionSphere->SetGenerateOverlapEvents(false);
-	
-	Character = Cast<AFPSCharacter>(OtherActor);
-	if (Character) {
-		if (Character->hasPrimaryWeapon== false)
-		{
-			Character->WeaponUsingNum = 0;
-			Character->hasPrimaryWeapon = true;
-			Character->OnUseWeapon = this;
-
-			SetWeaponForPlayer(Character, TEXT("WeaponPlace"));
-
-			
-			
-			return;
-		}
-		else if(Character->hasSecondaryWeapon == false && Character->hasPrimaryWeapon == true) {
-			Character->hasSecondaryWeapon = true;
-
-			
-			SetWeaponForPlayer(Character, TEXT("Second Weapon"));
-
-			return;
-
-		}
-	}
-
-}
-									
-
 void AWeapon::Shoot() {
 
 
-	if(InRealAmmo>0 && !isReloading ){
+	if(InRealAmmo>0 && !bIsReloading ){
 		InRealAmmo--;
-
-		
-
-
-
-
-
-
-	if (Character == nullptr || Character->GetController() == nullptr)
-	{
-		return;
-	}
 
 	// Try and fire a projectile
 	if (ProjectileClass != nullptr)
@@ -148,8 +86,6 @@ void AWeapon::Shoot() {
 			// MuzzleOffset is in camera space, so transform it to world space before offsetting from the character location to find the final muzzle position
 
 			FVector SocketPos = Mesh->GetSocketLocation("Projectile");
-
-
 			const FVector SpawnLocation = SocketPos + SpawnRotation.RotateVector(FVector(0.0f, 0.0f, 0.0f));
 
 			//Set Spawn Collision Handling Override
@@ -159,7 +95,6 @@ void AWeapon::Shoot() {
 			// Spawn the projectile at the muzzle
 			AActor* Projectile = World->SpawnActor<AFKFPSProjectile>(ProjectileClass, SpawnLocation, SpawnRotation, ActorSpawnParams);
 			Projectile->SetOwner(this);
-
 		}
 	}
 
@@ -169,36 +104,29 @@ void AWeapon::Shoot() {
 		Character->Reload();
 	
 	}
-
 }
-
-
-
 void AWeapon::Reload() {
-	if (InRealAmmo < MaxAmmo) {
+	if (InRealAmmo < MaxAmmo)
+	{
 		MaxAmmo = InRealAmmo + MaxAmmo - AmmoPerReload;
-
 		InRealAmmo = AmmoPerReload;
 		UE_LOG(LogTemp, Warning, TEXT("Max Ammo:%f"), MaxAmmo);
-
 	}
-	else if (MaxAmmo!= 0 && AmmoPerReload > MaxAmmo) {
-
-
+	else if (MaxAmmo != 0 && AmmoPerReload > MaxAmmo) {
 		
-		auto CaculateAmmo =AmmoPerReload- InRealAmmo;
-
-		
-
-		MaxAmmo =AmmoPerReload- FMath::Min(MaxAmmo, CaculateAmmo);
-		InRealAmmo +=CaculateAmmo ;
-
+		auto CaculateAmmo = AmmoPerReload - InRealAmmo;
+		auto AmmoWillAdd = MaxAmmo - CaculateAmmo;
+		if (AmmoWillAdd >= 0) {
+			InRealAmmo += CaculateAmmo;
+			MaxAmmo = AmmoWillAdd;
+		}
+		else {
+			InRealAmmo += MaxAmmo;
+			MaxAmmo = 0;
+		}
+	}
+	if (MaxAmmo < 0) {
 		MaxAmmo = 0;
-	//	
-
-
-		UE_LOG(LogTemp, Warning, TEXT("In Real Ammo:%f"), InRealAmmo);
-
 	}
 
 	Character->UpdateAmmoInfo();
@@ -206,13 +134,19 @@ void AWeapon::Reload() {
 
 
 void AWeapon::SetWeaponForPlayer(AFPSCharacter* thisCharacter, FName Text) {
-	thisCharacter->Inventory.PrimaryWeapon.Add(this);
+	Character = thisCharacter;
+	Character->Inventory->OccuppiedSlot.Add(this);
+	Character->UpdateAmmoInfo();
 
+	Mesh->SetSimulatePhysics(false);
+	Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Mesh->SetCollisionObjectType(ECC_WorldDynamic);
+	
 	FVector NewRalative = FVector(0, 0, 0);
-	this->SetActorRelativeLocation(NewRalative);
-	this->AttachToComponent(thisCharacter->GetMesh(), FAttachmentTransformRules::KeepRelativeTransform,Text);
-	CollisionSphere->SetHiddenInGame(true);
-	thisCharacter->UpdateAmmoInfo();
+	FRotator NewRotator = FRotator(0, 0, 0);
 
+	this->SetActorRelativeLocation(NewRalative);
+	this->SetActorRelativeRotation(NewRotator);
+	this->AttachToComponent(thisCharacter->GetMesh(), FAttachmentTransformRules::KeepRelativeTransform,Text);
 	this->SetOwner(thisCharacter);
 }

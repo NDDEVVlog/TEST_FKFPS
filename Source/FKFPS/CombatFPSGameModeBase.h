@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "TeamData.h"
 #include "GameFramework/GameModeBase.h"
 #include "CombatFPSGameModeBase.generated.h"
 
@@ -28,11 +29,9 @@ protected:
 	void BeginPlay();
 public:
 
-	int32 RedMembers;
-	int32 BlueMembers;
+	TArray<int32> TeamMember = {0,0};
 
 	void ActorDied(AActor* actorDied);
 
-	int32 GetRedMemberNum();
-	int32 GetBlueMemberNum();
+	void CheckWinCondition(EDataTeam Data,int32 Memberleft);
 };

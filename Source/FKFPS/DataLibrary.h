@@ -17,9 +17,17 @@ UENUM()
 enum class EWeaponType : uint8 {
 	None UMETA(DisplayName = "None"),
 	AK47 UMETA(DisplayName = "AK47"),
-	M4A1 UMETA(DisplayName = "M4A1")
+	M4A1 UMETA(DisplayName = "M4A1"),
+	GL   UMETA(DisplayName = "GL")
 	
 };
+
+/*UENUM()
+enum class EWeaponCombatType : uint8 {
+	Rifle UMETA(DisplayName = " Rifle"),
+	Snipe UMETA(DisplayName = "Snipe"),
+	Gernade UMETA(DisplayName = "Gernade")
+};*/
 
 USTRUCT(BlueprintType)
 struct FGennericWeaponInfo {
@@ -42,7 +50,12 @@ struct FGennericWeaponInfo {
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Info")
 		float AmmoPerReload;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Info")
+		float FireRate;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Info")
 		UParticleSystem* Particle;
+	UPROPERTY(EditAnywhere, Category = Projectile)
+		TSubclassOf<class AFKFPSProjectile> ProjectileClass;
+	
 };
 
 
@@ -68,7 +81,11 @@ struct FWeaponInformationTable : public FTableRowBase {
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Info")
 		float AmmoPerReload;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Info")
+		float FireRate;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Info")
 		UParticleSystem* Particle;
+	UPROPERTY(EditAnywhere, Category = Projectile)
+		TSubclassOf<class AFKFPSProjectile> ProjectileClass;
 };
 
 

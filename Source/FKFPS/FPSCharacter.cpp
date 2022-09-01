@@ -5,8 +5,10 @@
 #include "Weapon.h"
 #include "Components/CapsuleComponent.h"
 #include "Kismet/GameplayStatics.h"
-
+#include "InventoryComponent.h"
+#include "DrawDebugHelpers.h"
 #include "CombatFPSGameModeBase.h"
+#include "Containers/Array.h"
 
 
 // Sets default values
@@ -14,7 +16,8 @@ AFPSCharacter::AFPSCharacter()
 {
  	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
-
+	Inventory = CreateDefaultSubobject<UInventoryComponent>(TEXT("Inventory"));
+	
 }
 
 // Called when the game starts or when spawned
@@ -22,7 +25,7 @@ void AFPSCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 	Health = MaxHealth;
-
+	Kills = 0;
 	
 }
 
@@ -32,7 +35,7 @@ void AFPSCharacter::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 	FPSGameMode = Cast<ACombatFPSGameModeBase>(UGameplayStatics::GetGameMode(this));
 }
-
+	
 // Called to bind functionality to input
 void AFPSCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
@@ -41,16 +44,19 @@ void AFPSCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
 	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
 
-
-
-	PlayerInputComponent->BindAction("Swap", IE_Pressed, this, &AFPSCharacter::SwapWeapon);
+	//Bind Input Events
+	PlayerInputComponent->BindAction("Pickup", IE_Pressed, this, &AFPSCharacter::Pickup);
+	PlayerInputComponent->BindAction("Unequip", IE_Pressed, this, &AFPSCharacter::Unequip);
+	PlayerInputComponent->BindAction("1", IE_Pressed, this, &AFPSCharacter::Num1);
+	PlayerInputComponent->BindAction("2", IE_Pressed, this, &AFPSCharacter::Num2);
+	PlayerInputComponent->BindAction("3", IE_Pressed, this, &AFPSCharacter::Num3);
+    PlayerInputComponent->BindAction("4", IE_Pressed, this, &AFPSCharacter::Num4);
+	PlayerInputComponent->BindAction("5", IE_Pressed, this, &AFPSCharacter::Num5);
 
 	// Bind fire event
 	PlayerInputComponent->BindAction("PrimaryAction", IE_Pressed, this, &AFPSCharacter::OnPrimaryAction);
 	PlayerInputComponent->BindAction("PrimaryAction", IE_Released, this, &AFPSCharacter::ReleasePrimaryAction);
-
 	PlayerInputComponent->BindAction("Reload", IE_Pressed, this, &AFPSCharacter::Reload);
-
 
 	// Bind movement events
 	PlayerInputComponent->BindAxis("Move Forward / Backward", this, &AFPSCharacter::MoveForward);
@@ -64,14 +70,32 @@ void AFPSCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 }
 void AFPSCharacter::OnPrimaryAction()
 {	
-	if (OnUseWeapon == nullptr) return;
-
 	GetWorldTimerManager().SetTimer(FireTimeHandle, this,&AFPSCharacter::FireShoot, 0.1f, true);
-
 }
 void AFPSCharacter::FireShoot() {
-	OnUseWeapon->Shoot();
+	if (Inventory->OnUseWeapon == nullptr) return;
+	
+	Inventory->OnUseWeapon->Shoot();
 	UpdateAmmoInfo();
+}
+
+void AFPSCharacter::Num1() {
+	SwapWeapon(1);
+}
+void AFPSCharacter::Num2() {
+	SwapWeapon(2);
+
+}
+void AFPSCharacter::Num3() {
+	SwapWeapon(3);
+
+}
+void AFPSCharacter::Num4() {
+	SwapWeapon(4);
+
+}
+void AFPSCharacter::Num5() {
+	SwapWeapon(5);
 
 }
 
@@ -103,28 +127,43 @@ void AFPSCharacter::LookUpAtRate(float Rate)
 {
 	// calculate delta for this frame from the rate information
 	AddControllerPitchInput(Rate * TurnRateGamepad * GetWorld()->GetDeltaSeconds());
+	
+}
+void AFPSCharacter::Unequip() {
+	Inventory->Unequip(this);
 }
 
+void AFPSCharacter::SwapWeapon(int32 NumberofSlot) {
+	if ((NumberofSlot-1) >= Inventory->OccuppiedSlot.Num()) return;
 
-void AFPSCharacter::SwapWeapon() {
-	if(Inventory.PrimaryWeapon.Num() == 2)
-	if (WeaponUsingNum == 0) {
-		Inventory.PrimaryWeapon[WeaponUsingNum]->AttachToComponent(this->GetMesh(), FAttachmentTransformRules::KeepRelativeTransform, TEXT("Second Weapon"));
 
-		WeaponUsingNum = 1;
-		Inventory.PrimaryWeapon[WeaponUsingNum]->AttachToComponent(this->GetMesh(), FAttachmentTransformRules::KeepRelativeTransform, TEXT("WeaponPlace"));
-		OnUseWeapon = Inventory.PrimaryWeapon[WeaponUsingNum];
+	if (Inventory->OnUseWeapon != nullptr) {
+		if (Inventory->OccuppiedSlot[NumberofSlot - 1] == nullptr) return;
+		int32 index = 0;
+
+		for (int32 i = 0; i < Inventory->OccuppiedSlot.Num(); i++) {
+			if (Inventory->OnUseWeapon == Inventory->OccuppiedSlot[i]) {
+				index = i;
+				UE_LOG(LogTemp, Warning, TEXT("Bruh"));
+
+				break;
+			}
+		}
+		// how tf did i do it
+		Inventory->OnUseWeapon->Mesh->AttachToComponent(this->GetMesh(), FAttachmentTransformRules::KeepRelativeTransform, Inventory->SlotName[index + 1]);
+		Inventory->OnUseWeapon = Inventory->OccuppiedSlot[NumberofSlot - 1];
+		Inventory->OnUseWeapon->Mesh->AttachToComponent(this->GetMesh(), FAttachmentTransformRules::KeepRelativeTransform, Inventory->SlotName[0]);
+		UpdateAmmoInfo();
 	}
 	else {
-		Inventory.PrimaryWeapon[WeaponUsingNum]->AttachToComponent(this->GetMesh(), FAttachmentTransformRules::KeepRelativeTransform, TEXT("Second Weapon"));
-
-		WeaponUsingNum = 0;
-
-		Inventory.PrimaryWeapon[WeaponUsingNum]->AttachToComponent(this->GetMesh(), FAttachmentTransformRules::KeepRelativeTransform, TEXT("WeaponPlace"));
-		OnUseWeapon = Inventory.PrimaryWeapon[WeaponUsingNum];
+		Inventory->OnUseWeapon = Inventory->OccuppiedSlot[NumberofSlot - 1];
+		Inventory->OnUseWeapon->Mesh->AttachToComponent(this->GetMesh(), FAttachmentTransformRules::KeepRelativeTransform, Inventory->SlotName[0]);
 	}
-	
-	UpdateAmmoInfo();
+}
+
+void AFPSCharacter::Pickup() {
+	Inventory->Pickup(this);
+
 }
 
 //Take Damage
@@ -134,7 +173,7 @@ float AFPSCharacter::TakeDamage(float DamageAmount, struct FDamageEvent const& D
 	
 	auto DamageToApply = FMath::Min(Health, DamageAplly);
 	Health -= DamageToApply;
-	if (isDead()) {
+	if (bIsDead()) {
 		DetachFromControllerPendingDestroy();
 		GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
@@ -146,14 +185,8 @@ float AFPSCharacter::TakeDamage(float DamageAmount, struct FDamageEvent const& D
 		else {
 			Causer->Kills++;
 		}
-		
-
 	}
-
-
 	return Health;
-
-
 }
 
 
@@ -164,30 +197,29 @@ void AFPSCharacter::ReleasePrimaryAction()
 
 
 void AFPSCharacter::Reload() {
-	if (OnUseWeapon == nullptr) return;
-
+	if (Inventory->OnUseWeapon == nullptr) return;
 	isReload = true; 
-	OnUseWeapon->isReloading = true;
-	
+	Inventory->OnUseWeapon->bIsReloading = true;
+
 	FTimerHandle Reloadtime;
 	GetWorldTimerManager().SetTimer(Reloadtime,this,&AFPSCharacter::NotReload, 3.3f,false);
-	if(MaxAmmo != 0)
-	OnUseWeapon->Reload();
-	
-
 }
 
 //Stop the reload animation
 void AFPSCharacter::NotReload() {
 	isReload = false;
-	OnUseWeapon->isReloading = false;
+	if (Inventory->OnUseWeapon == nullptr) return;
+	Inventory->OnUseWeapon->bIsReloading = false;
+
+	if (MaxAmmo != 0)
+		Inventory->OnUseWeapon->Reload();
+
 }
 
 
 //Update Ammo Info
 void AFPSCharacter::UpdateAmmoInfo() {
-	MaxAmmo = OnUseWeapon->MaxAmmo;
-	AmmoInReal = OnUseWeapon->InRealAmmo;
-
-
+	
+	MaxAmmo = Inventory->OnUseWeapon->MaxAmmo;
+	AmmoInReal = Inventory->OnUseWeapon->InRealAmmo;
 }
